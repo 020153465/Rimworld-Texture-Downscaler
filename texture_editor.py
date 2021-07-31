@@ -128,9 +128,6 @@ def parse_pixel_threshold(w, h):
 
 
 def count_texture_exceed_threshold(t_list, PIXEL_THRESHOLD, report):
-    # t_list = args[0]
-    # PIXEL_THRESHOLD = args[1]
-
     count = 0
     count_list = list()
     err = 0
@@ -143,7 +140,7 @@ def count_texture_exceed_threshold(t_list, PIXEL_THRESHOLD, report):
             w, h = img.size
             if w * h > PIXEL_THRESHOLD:
                 count += 1
-                count_list.append(f"({w}{h})\t"
+                count_list.append(f"({w}x{h})\t"
                                   f"{round(f_size, 2)} MB\t"
                                   f"{file}\n")
         except UnidentifiedImageError as e:
@@ -160,6 +157,7 @@ def submit_report(reports, t_list):
     err = 0
     cnt_path = ""
     err_path = ""
+    c_stripped = 0
     for report in reports:
         cnt += report[0]
         err += report[1]
@@ -228,7 +226,8 @@ def resize_with_pixel_area(t_list, p_area, report):
 
     for file in t_list:
         try:
-            f_name, f_ext = file.split(".", 1)
+            f_name = "/".join(file.split("\\")[:-1])
+            f_ext = file.split("\\")[-1].split(".")[-1]
             f_size = os.stat(file).st_size / 1048576 # Get Megabyte
             img = Image.open(file)
             w, h = img.size
