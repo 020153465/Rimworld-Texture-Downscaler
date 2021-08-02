@@ -14,6 +14,7 @@ import datetime
 from math import sqrt
 from PIL import Image, UnidentifiedImageError
 from tkinter import Tk, simpledialog, Entry, Label, messagebox, Button, TclError
+from tkinter.ttk import Progressbar
 from time import sleep
 ###################
 # GLOBAL VARIABLE #
@@ -157,7 +158,6 @@ def submit_report(reports, t_list):
     err = 0
     cnt_path = ""
     err_path = ""
-    c_stripped = 0
     for report in reports:
         cnt += report[0]
         err += report[1]
@@ -173,7 +173,7 @@ def submit_report(reports, t_list):
     long_msg =  f"Texture files exceeded {PIXEL_THRESHOLD} pixel area: \n" +\
                 f"{cnt_path}".replace(r"\\", "/") + \
                  "\n\n\n" + ("-" * 128) + "\n\n\n" + \
-                f"Texture files were skipped: \n"+\
+                 "Texture files were skipped: \n"+\
                 f"{err_path}".replace(r"\\", "/")
     try:
         file = open(f"{dt}.log", 'w')
@@ -258,8 +258,20 @@ def resize_with_pixel_area(t_list, p_area, report):
             err_list.append(f"{round(f_size, 4)} MB\t"
                             f"{file}\t"
                             f"{e}\n")
-        img.close()
+        try:
+            img.close()
+        except UnboundLocalError:
+            pass
+
     report.append([count, err, count_list, err_list])
+
+
+def progress_bar(title):
+    p_root = Tk()
+    p_root.geometry('640x50'), p_root.title(title)
+    p_bar = Progressbar(p_root, orient = 'horizontal', length = 640, mode = 'determinate')
+    p_bar.pack(pady = 10), p_root.update(), p_root.protocol("WM_DELETE_WINDOW", 'disable_event')
+    return p_root, p_bar
 
 
 """_____________________
@@ -278,9 +290,12 @@ def mp_job_driver(job, item_list):
     sub_length = len(item_list) // PROCESSES
     report = multiprocessing.Manager().list()
 
+    p_root, p_bar = progress_bar(f"{job.__name__}")
+
     if PRINT_INFO:
-        print(f"[INFO]: Submitting job: ")
+        print("[INFO]: Submitting job: ")
     for i in range(0, PROCESSES):
+        p_bar['value'] = int(i / PROCESSES * 50)
         # Sublist index
         lb = i * sub_length # lowerbound = worker_index * sub length  #
         ub = (i+1) % (PROCESSES) * sub_length - 1 # upperbound is next lower bound - 1 or -1
@@ -290,16 +305,19 @@ def mp_job_driver(job, item_list):
             worker = multiprocessing.Process(target=job, args=([item_list[lb:ub], PIXEL_THRESHOLD, report]))
             worker.start()
             foreman.append(worker)
+        p_root.update()
 
     # # Collecting results #
     if PRINT_INFO:
          print("[INFO]: Workers reporting in: ")
     # Contain sub results into list to send to the right parser #
     for i in range(0, PROCESSES):
-         foreman[i].join()
-         if PRINT_INFO:
-             print(f"\tWorker{[i]} - Reported in")
-
+        p_bar['value'] = int(50 + (i / PROCESSES * 50))
+        foreman[i].join()
+        p_root.update()
+        if PRINT_INFO:
+            print(f"\tWorker{[i]} - Reported in")
+    p_root.destroy()
     return report
 
 
@@ -319,7 +337,7 @@ def main(t_list, info):
         # Update pixel area threshold every operation #
         ###############################################
         if PRINT_INFO:
-            print(f"[INFO]: Prompting for pixel area threshold")
+            print("[INFO]: Prompting for pixel area threshold")
         update_pixel_threshold()
         if PIXEL_THRESHOLD is None:
             continue
